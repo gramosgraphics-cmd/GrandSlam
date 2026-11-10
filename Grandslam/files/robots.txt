@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://suykio.github.io/Grand-Slam/sitemap.xml
