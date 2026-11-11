@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>Diagnóstico · GrandSlam</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<style>
+body{font:15px/1.45 system-ui,sans-serif;background:#02189e;color:#fff;max-width:760px;margin:0 auto;padding:20px}
+li{list-style:none;margin:8px 0;padding:10px 12px;border-radius:10px;background:#0003}.ok{border-left:5px solid #4ade80}.no{border-left:5px solid #f87171}.i{border-left:5px solid #fecb02}
+small{display:block;color:#cfd6ff;word-break:break-all}input,button{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid #fff5;background:#fff1;color:#fff}button{background:#fecb02;color:#02189e;font-weight:700;cursor:pointer;border:0}
+</style></head><body>
+<h1>Diagnóstico</h1><p>Se ejecuta solo. Copia o captura todo lo que aparezca aquí.</p>
+<ul id="out"></ul>
+<h2>Probar entrar</h2>
+<input id="em" type="email" placeholder="Correo"> <input id="pw" type="password" placeholder="Contraseña"> <button id="go">Probar</button>
+<script src="../config.js"></script>
+<script>
+const out = document.getElementById('out');
+const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const add = (cls, t, d) => { const li = document.createElement('li'); li.className = cls; li.innerHTML = t + (d ? '<small>' + esc(d) + '</small>' : ''); out.appendChild(li); };
+const C = window.GS_CONFIG || {}, URL_ = C.url, KEY = C.anonKey;
+const err = e => (e && (e.name + ': ' + e.message)) || String(e);
+async function tryFetch(label, url, opt, okStatuses) {
+  try { const r = await fetch(url, opt); const ok = okStatuses.includes(r.status);
+    add(ok ? 'ok' : 'no', (ok ? '✔ ' : '✘ ') + label + ' → HTTP ' + r.status, (await r.text()).slice(0, 160)); return ok; }
+  catch (e) { add('no', '✘ ' + label + ' → NO LLEGÓ AL SERVIDOR (error de red/bloqueo)', err(e)); return false; }
+}
+(async () => {
+  if (!URL_ || !KEY) return add('no', '✘ No se encontró config.js o está vacío', 'Debe estar en la raíz del sitio, junto al index.html principal.');
+  let tipo = KEY.startsWith('sb_') ? 'clave nueva (sb_publishable)' : 'clave JWT';
+  try { if (!KEY.startsWith('sb_')) tipo += ', rol: ' + JSON.parse(atob(KEY.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).role; } catch {}
+  add('i', 'config.js leído', URL_ + '  ·  ' + tipo + '  ·  ' + KEY.slice(0, 14) + '…');
+  const j = { 'Content-Type': 'application/json' };
+  await tryFetch('1) Servidor de Supabase responde (solo apikey)', URL_ + '/auth/v1/settings', { headers: { apikey: KEY } }, [200]);
+  const body = JSON.stringify({ email: 'prueba@example.com', password: 'x' });
+  const a = await tryFetch('2) Intento de login falso, solo apikey (debe dar 400 "credenciales")', URL_ + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { ...j, apikey: KEY }, body }, [400]);
+  const b = await tryFetch('3) Igual, pero con Authorization: Bearer (como las librerías viejas)', URL_ + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { ...j, apikey: KEY, Authorization: 'Bearer ' + KEY }, body }, [400]);
+  if (a && !b) add('i', 'Conclusión: el servidor rechaza la cabecera Authorization con esta clave. Usa la clave anon (eyJ…) en config.js o la versión nueva de los archivos.');
+  if (!a && !b) add('i', 'Conclusión: nada llega a Supabase desde este navegador. Prueba en incógnito sin extensiones, con otra red o cambiando el DNS a 1.1.1.1.');
+  try { await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm'); add('ok', '✔ 4) Librería de Supabase cargada'); } catch (e) { add('no', '✘ 4) No se pudo cargar la librería (jsdelivr bloqueado)', err(e)); }
+  for (const [f, marca, n] of [['index.html', 'noBearerKey', 'panel de administración'], ['../script.js', 'startsWith("sb_")', 'script.js de la página']]) {
+    try { const t = await (await fetch(f + '?v=' + Date.now(), { cache: 'no-store' })).text(); add(t.includes(marca) ? 'ok' : 'no', (t.includes(marca) ? '✔ ' : '✘ ') + '5) ' + n + (t.includes(marca) ? ': versión NUEVA publicada' : ': todavía es la versión VIEJA (sube el archivo nuevo)')); }
+    catch (e) { add('no', '✘ 5) No se pudo leer ' + f, err(e)); }
+  }
+})();
+document.getElementById('go').onclick = async () => {
+  try {
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm');
+    const sb = createClient(URL_, KEY, { global: { fetch: (u, o = {}) => { const h = new Headers(o.headers); if (KEY.startsWith('sb_') && h.get('Authorization') === 'Bearer ' + KEY) h.delete('Authorization'); return fetch(u, { ...o, headers: h }); } } });
+    const { data, error } = await sb.auth.signInWithPassword({ email: document.getElementById('em').value, password: document.getElementById('pw').value });
+    add(error ? 'no' : 'ok', error ? '✘ Login: ' + error.message : '✔ Login correcto como ' + data.user.email, error ? (error.name + ' · estado ' + (error.status ?? 'sin respuesta')) : '');
+  } catch (e) { add('no', '✘ Login falló', err(e)); }
+};
+</script></body></html>
