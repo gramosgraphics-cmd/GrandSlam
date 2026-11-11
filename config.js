@@ -4,5 +4,5 @@
    NUNCA pongas aquí la clave "service_role" ni la de Gemini. */
 window.GS_CONFIG = {
   url: "https://chnzgphpuluxuyvfxxgp.supabase.co",
-  anonKey: "sb_publishable_54QZc6imYitvlA-ZSxt0nA_U_DyzpQP"
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNobnpncGhwdWx1eHV5dmZ4eGdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNTUzMDgsImV4cCI6MjEwOTkzMTMwOH0.Hebo-Gnp5BdFrWyi8S66wZGUH47eyOr_xqm_l3jEox0"
 };
