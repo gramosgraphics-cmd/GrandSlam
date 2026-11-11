@@ -133,14 +133,31 @@ $("#main").addEventListener("click",e=>{const c=e.target.closest("[data-g],[data
 function pill(){const b=$('#tabs [aria-selected="true"]'),p=$("#pill");p.classList.add("go");p.style.left=b.offsetLeft+"px";p.style.width=b.offsetWidth+"px";setTimeout(()=>p.classList.remove("go"),550)}
 $("#tabs").onclick=e=>{const b=e.target.closest("button");if(!b)return;document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));tab=b.dataset.t;game=null;if(location.hash)location.hash="";else{render();pill()}};
 /* Simulación momentánea del partido en vivo (reemplazable por datos reales) */
-const liveG=flat.filter(g=>g.st==="live");liveG.forEach(g=>{g.top=false;g.outs=0;g.sim=[];g.b=0;g.s=0;g.bs=[false,false,false]});
-const SE=[["sencillo al jardín central",0,0],["ponche (3 strikes)",1,0],["elevado al jardín derecho, out",1,0],["doble por la banda izquierda",0,0],["rodado al campocorto, out",1,0],["base por bolas",0,0],["jonrón por el jardín izquierdo",0,1],["línea al tercera base, out",1,0]];
-setInterval(()=>{const sc=[];liveG.forEach(g=>{const e=SE[Math.floor(Math.random()*8)],t=g.top?g.a:g.h,b=bat(t,Math.floor(Math.random()*9));
- const run=e[2]?1+(Math.random()<.4?1:0):0;if(g.top)g.as+=run;else g.hs+=run;g.outs+=e[1];g.b=Math.floor(Math.random()*4);g.s=Math.floor(Math.random()*3);g.bs=[Math.random()<.5,Math.random()<.3,Math.random()<.2];
- g.sim.unshift(`<small>${g.top?"Alta":"Baja"} ${g.inn} · ${T(t).a}</small>${b.name}: ${e[0]}${run?" · +"+run+" carr.":""}`);if(g.sim.length>40)g.sim.pop();
- if(g.outs>=3){g.outs=0;if(g.top)g.top=false;else{g.top=true;g.inn++}}
- if(run)sc.push(g)});
- if(!page&&tab==="live"&&!(game&&gtab==="game"&&gsub==="field")){render();sc.forEach(g=>document.querySelector(`[data-g="${g.di}-${g.k}"]`)?.classList.add("bump"))}},3500);
+/* Marcadores en vivo desde Supabase */
+const SB_URL="https://sjxyomevqmnufqmthwuh.supabase.co";
+const SB_KEY="sb_publishable_FJIJNZFbcUw6A2dKw4e06Q_GMf9oUPu";
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+
+// valores por defecto del partido en vivo (antes de que llegue el dato)
+flat.filter(g=>g.st==="live").forEach(g=>{g.top=false;g.outs=0;g.sim=[];g.b=0;g.s=0;g.bs=[false,false,false]});
+
+function aplicar(r){
+ const g=flat.find(x=>x.di===r.di&&x.k===r.k);if(!g)return;
+ const antes=g.hs+g.as;
+ g.hs=r.carreras_local;g.as=r.carreras_visitante;g.inn=r.entrada;
+ g.top=r.mitad==="alta";g.outs=r.outs;g.b=r.balls;g.s=r.strikes;
+ g.bs=r.bases;g.st=r.estado;g.sim=(r.jugadas||[]).map(esc);
+ if(!page&&tab==="live"&&!(game&&gtab==="game"&&gsub==="field")){
+  render();
+  if(g.hs+g.as>antes)document.querySelector(`[data-g="${g.di}-${g.k}"]`)?.classList.add("bump");
+ }
+}
+
+sb.from("juegos").select("*").then(({data})=>(data||[]).forEach(aplicar));
+sb.channel("juegos-live")
+ .on("postgres_changes",{event:"*",schema:"public",table:"juegos"},p=>p.new&&aplicar(p.new))
+ .subscribe();
 let page=null;
 function viewPage(){const b='<button class="back" data-back>← Volver al inicio</button>';
  return page==="404"?b+'<div class="glass panel"><h2>404 · Jugada fuera del cuadro</h2><p style="color:var(--soft)">La página que buscas no existe o cambió de lugar. Vuelve al inicio para seguir los marcadores.</p></div>':b+`<div class="glass panel legal"><h2>${LEGAL[page][0]}</h2>${LEGAL[page][1]}</div>`}
