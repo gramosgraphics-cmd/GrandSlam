@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /admin-standalone/
-
-Sitemap: https://suykio.github.io/Grand-Slam/sitemap.xml
